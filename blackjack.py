@@ -25,7 +25,8 @@ def playBJ():
     count = 0
     hidden_card = []
     hidden_status = TRUE
-    pc_bust_checker = 0
+    ace_check = FALSE 
+    pc_bust_checker = []
 
     def createCard():
         nonlocal pip_values 
@@ -95,7 +96,7 @@ def playBJ():
         return card_history
 
     def computeVal():
-        nonlocal card_history, count, player_score, pc_score, pip_values, hidden_card
+        nonlocal card_history, count, player_score, pc_score, pip_values, hidden_card, pc_bust_checker, ace_check
         check_BJ_pc = FALSE
         check_BJ_user = FALSE
         
@@ -105,15 +106,19 @@ def playBJ():
                 print(f"You have been dealt a {card_history[i]} faced up!")
                 if (card_val[pip_values[i]] == (1,11)) and (card_val[pip_values[count]] == 10): check_BJ_user = TRUE
                 elif (card_val[pip_values[i]] == 10) and (card_val[pip_values[count]] == (1,11)): check_BJ_user = TRUE
+                if (card_val[pip_values[i]] == (1,11)): ace_check = TRUE 
             else:
                 pc_score.append(card_val[pip_values[i]])
                 if (i != len(card_history)-1): 
                     print(f"The house has revealed a {card_history[i]}")
                     if (card_val[pip_values[i]] == (1,11)) and (card_val[pip_values[-1]] == 10): check_BJ_pc = TRUE
                     elif (card_val[pip_values[i]] == 10) and (card_val[pip_values[-1]] == (1,11)): check_BJ_pc = TRUE
+                    if (card_val[pip_values[i]] != (1,11)): pc_bust_checker.append(card_val[pip_values[i]])
+                    
                 else: 
                     hidden_card.append(card_history[-1])
                     print("The dealer puts their 2nd card faced down. All cards have now been dealt. \n")
+                    if (card_val[pip_values[i]] != (1,11)): pc_bust_checker.append(card_val[pip_values[i]])
                     if (check_BJ_pc == TRUE) and (check_BJ_user != TRUE): 
                         print(pc_score)
                         print('Blackjack! Computer Wins')
@@ -129,7 +134,7 @@ def playBJ():
         return count
 
     def checkState():
-        nonlocal player_score, pc_score, pc_bust_checker 
+        nonlocal player_score, pc_score, pc_bust_checker, ace_check
 
         while hidden_status == TRUE: 
             # check for naturals first
@@ -137,10 +142,15 @@ def playBJ():
                 if player_score[i] == (1,11):
                     ace_val = input("Would you like Ace to be valued as a 1 or 11? ")
                     player_score[i] = int(ace_val)
+                    ace_check = TRUE 
                     print(player_score)
 
+            if (ace_check == TRUE): 
+                player_score = modifyAces()
+                print(player_score)
+
             # if player decides to keep hitting
-            if sum(list(player_score)) <= 21:
+            if sum(list(player_score)) <= 21: 
                 if (sum(list(player_score)) == 21): 
                     print(f"Blackjack! {username} wins!")
                     system.exit() 
@@ -155,9 +165,12 @@ def playBJ():
             # ace condition
             for i in range(0,len(pc_score)):
                 if pc_score[i] == (1,11):
-                    if (int(pc_score[i]) + pc_bust_checker) >= 17:
-                        pc_score[i] = 11 
-                    else: pc_score[i] = 1 
+                    if ((11 + int(pc_bust_checker[-1])) >= 17) and ((11+ int(pc_bust_checker[-1])) <= 21):
+                        pc_score[i] = 11
+                        pc_bust_checker.append(sum(list(pc_score)))
+                    else: 
+                        pc_score[i] = 1
+                        pc_bust_checker.append(sum(list(pc_score)))
 
             if sum(list(pc_score)) <= 21:
                 if (sum(list(pc_score)) == 21): 
@@ -167,16 +180,17 @@ def playBJ():
                     print("The computer takes another card.")
                     addCard('pc')
                     print(pc_score)
-                    pc_bust_checker = sum(list(pc_score))
                     checkState()
-                else: 
+                elif (sum(list(pc_score)) >= 17): 
+                    print(f"{pc_score} = {sum(list(pc_score))}")
                     announceWinners()
                     break
             else: 
+                print(f"{sum(list(pc_score))} > 21")
                 print("Computer's over 21 and busted! You win!")
                 system.exit()
 
-        return 
+        return player_score
 
     def playerActions():
         # future features to inlcude (1) splitting pairs (2) doubling down and (3) insurance
@@ -199,22 +213,39 @@ def playBJ():
         nonlocal hidden_card, pc_score, hidden_status, pc_bust_checker
 
         print(f"The dealer reveals the {hidden_card[-1]} as the hidden card!")
+        # print(pc_bust_checker)
         hidden_status = FALSE 
 
         for i in range(0,len(pc_score)):
             if (pc_score[i]) == (1,11):
-                if (pc_score[i] == (1,11)) and (pc_score[-1] != (1,11)) and (11 + int(pc_score[-1]) >= 17):
-                    pc_score[i] = 11
-                elif (pc_score[i] == (1,11)) and (pc_score[-1] == (1,11)):
-                    pc_score[i] = 11
-                    pc_score[-1] = 1
+                if (11 + sum(list(pc_bust_checker)) >= 17):
+                    if (pc_score[i] == (1,11)) and (pc_score[-1] != (1,11)):
+                        pc_score[i] = 11
+                    elif (pc_score[i] == (1,11)) and (pc_score[-1] == (1,11)):
+                        pc_score[i] = 11                   
+                elif sum(list(pc_bust_checker)) == 0:
+                    pc_score[i] = 1
                 else: pc_score[i] = 1
-        
-        pc_bust_checker = sum(list(pc_score))
+            
+        pc_bust_checker.append(sum(list(pc_score)))
+        # print(f"{pc_score} = {pc_bust_checker[-1]}")
 
         checkState()
 
         return 
+
+    def modifyAces():
+        nonlocal player_score
+
+        question = input("Do you want to reassign values to your ace(s)?")
+
+        if question == 'Yes':
+            for item in range(0,len(player_score)):
+                if (int(player_score[item]) == 1) or (int(player_score[item]) == 11):
+                    player_score[item] = int(input("Select a new value for ace: "))
+        else: return player_score
+
+        return player_score
 
     def announceWinners():
         nonlocal player_score, pc_score
@@ -222,10 +253,14 @@ def playBJ():
         player_final = sum(list(player_score))
         pc_final = sum(list(pc_score))
 
-        result = max(player_final,pc_final)
+        if player_final == pc_final:
+            print("It's a tie!")
+            system.exit()
+        else:
+            result = max(player_final,pc_final)
 
-        print(f"{username} wins this round!") if result == sum(list(player_score)) else print("Computer wins this round. Better luck next time!")
-        system.exit()
+            print(f"{username} wins this round!") if result == sum(list(player_score)) else print("Computer wins this round. Better luck next time!")
+            system.exit()
 
         return 
 
